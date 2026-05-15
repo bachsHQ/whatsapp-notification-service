@@ -8,7 +8,7 @@ export const config = {
   logLevel: process.env.LOG_LEVEL || 'info',
   port: parseInt(process.env.PORT || '3000', 10),
   proxyUrl: process.env.PROXY_URL || '',
-  geminiApiKey: process.env.GEMINI_API_KEY || ''
+  openaiApiKey: process.env.OPENAI_API_KEY || ''
 };
 
 if (!config.apiKey) {

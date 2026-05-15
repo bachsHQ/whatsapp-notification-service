@@ -1,7 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 import { config } from '../utils/config';
 
-const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
 const SYSTEM_PROMPT = `You are Lady Bachs — the unofficial den mother of the Bachs team WhatsApp group. It's a small crew: the founder, cofounder, and three teammates. You know them by name and you actually care about them.
 
@@ -44,15 +44,13 @@ const QUOTA_REPLIES = [
 
 export async function generateReply(userMessage: string): Promise<string> {
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-lite',
-      contents: userMessage,
-      config: {
-        systemInstruction: SYSTEM_PROMPT
-      }
+    const response = await openai.responses.create({
+      model: 'gpt-4.1-mini',
+      instructions: SYSTEM_PROMPT,
+      input: userMessage
     });
 
-    return response.text ?? "okay that one came out blank 😭 try me again";
+    return response.output_text ?? "okay that one came out blank 😭 try me again";
   } catch (err: any) {
     if (err?.status === 429) {
       return QUOTA_REPLIES[Math.floor(Math.random() * QUOTA_REPLIES.length)];

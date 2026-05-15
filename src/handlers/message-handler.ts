@@ -1,5 +1,5 @@
 import { WASocket, proto } from '@whiskeysockets/baileys';
-import { generateReply } from '../ai/gemini';
+import { generateReply } from '../ai/ai';
 import { logger } from '../utils/logger';
 
 // Unwrap all the common message wrapper layers and return the inner IMessage
