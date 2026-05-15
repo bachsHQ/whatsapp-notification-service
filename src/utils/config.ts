@@ -6,7 +6,9 @@ export const config = {
   apiKey: process.env.API_KEY || '',
   serviceName: process.env.SERVICE_NAME || 'WhatsApp Notification Service',
   logLevel: process.env.LOG_LEVEL || 'info',
-  port: parseInt(process.env.PORT || '3000', 10)
+  port: parseInt(process.env.PORT || '3000', 10),
+  proxyUrl: process.env.PROXY_URL || '',
+  geminiApiKey: process.env.GEMINI_API_KEY || ''
 };
 
 if (!config.apiKey) {
