@@ -87,18 +87,22 @@ export class MessageHandler {
 
     const mentionedJids = extractMentions(inner);
     const botNumber = this.botJid.split(':')[0] + '@s.whatsapp.net';
-    const botLidNumber = this.botLid ? this.botLid.split(':')[0] : '';
+    const botLidNumber = this.botLid ? this.botLid.split('@')[0].split(':')[0] : '';
     logger.debug({ botJid: this.botJid, botLid: this.botLid, botNumber, botLidNumber, mentionedJids }, 'Checking mention');
 
     const isMentioned = mentionedJids.some((m) => {
-      // Strip device suffix (:0, :2, etc) and domain (@s.whatsapp.net, @lid)
       const numericId = m.split('@')[0].split(':')[0];
       if (m.endsWith('@lid')) return numericId === botLidNumber;
       return numericId + '@s.whatsapp.net' === botNumber;
     });
 
-    if (!isMentioned) {
-      logger.debug({ jid }, 'Skipping — bot not mentioned');
+    // Also trigger if the user quoted one of the bot's own messages
+    const quotedParticipant = inner.extendedTextMessage?.contextInfo?.participant ?? '';
+    const quotedId = quotedParticipant.split('@')[0].split(':')[0];
+    const isQuoteReply = quotedId === botLidNumber || quotedParticipant === botNumber;
+
+    if (!isMentioned && !isQuoteReply) {
+      logger.debug({ jid }, 'Skipping — bot not mentioned or quoted');
       return;
     }
 
