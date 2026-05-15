@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../utils/config';
 import { loadMemory, appendAndSave, Message } from './memory';
+import { getAllContacts, resolveContact } from './contacts';
 
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
@@ -34,6 +35,12 @@ What you don't do:
 - Breaking character. You're Lady Bachs, always.
 - Pretending to know things you don't. If someone asks you something factual you're unsure about, say so and move on.
 
+Tagging people:
+- When asked to tag or mention someone by name, use the placeholder [TAG:Name] in your message where the mention should appear.
+- Example: "oya [TAG:Tega] 👏 cracked engineer fr, take your flowers"
+- Only use [TAG:Name] when explicitly asked to tag/mention someone, or when it genuinely makes sense to call someone out directly.
+- Use the exact name as given to you.
+
 You're part of the team. Act like it.`;
 
 const QUOTA_REPLIES = [
@@ -43,10 +50,43 @@ const QUOTA_REPLIES = [
   "i'm here i'm here, just had a moment. retry?",
 ];
 
-export async function generateReply(senderJid: string, userMessage: string): Promise<string> {
-  const mem = loadMemory(senderJid);
+export interface AIReply {
+  text: string;
+  mentions: Array<{ name: string; jid: string }>;
+}
 
-  // Build input from history + current message
+function buildContactsContext(): string {
+  const contacts = getAllContacts();
+  if (contacts.length === 0) return '';
+  const list = contacts.map((c) => c.name).join(', ');
+  return `\nTeam members you know: ${list}.`;
+}
+
+function parseReply(raw: string): AIReply {
+  const mentions: Array<{ name: string; jid: string }> = [];
+  const TAG_RE = /\[TAG:([^\]]+)\]/g;
+
+  const text = raw.replace(TAG_RE, (_, name) => {
+    const jid = resolveContact(name);
+    if (jid) {
+      mentions.push({ name, jid });
+      return `@${jid.split('@')[0].split(':')[0]}`;
+    }
+    // Unknown contact — keep name as plain text
+    return name;
+  });
+
+  return { text, mentions };
+}
+
+export async function generateReply(senderJid: string, userMessage: string): Promise<AIReply> {
+  const mem = loadMemory(senderJid);
+  const contactsCtx = buildContactsContext();
+
+  const systemWithContacts = contactsCtx
+    ? SYSTEM_PROMPT + contactsCtx
+    : SYSTEM_PROMPT;
+
   const input: Message[] = [
     ...mem.history,
     { role: 'user', content: userMessage }
@@ -55,19 +95,20 @@ export async function generateReply(senderJid: string, userMessage: string): Pro
   try {
     const response = await openai.responses.create({
       model: 'gpt-4.1-mini',
-      instructions: SYSTEM_PROMPT,
+      instructions: systemWithContacts,
       input: input.map((m) => ({ role: m.role, content: m.content }))
     });
 
-    const reply = response.output_text ?? "okay that one came out blank 😭 try me again";
+    const raw = response.output_text ?? "okay that one came out blank 😭 try me again";
+    const parsed = parseReply(raw);
 
-    // Persist the exchange
-    appendAndSave(senderJid, userMessage, reply);
+    appendAndSave(senderJid, userMessage, raw);
 
-    return reply;
+    return parsed;
   } catch (err: any) {
     if (err?.status === 429) {
-      return QUOTA_REPLIES[Math.floor(Math.random() * QUOTA_REPLIES.length)];
+      const text = QUOTA_REPLIES[Math.floor(Math.random() * QUOTA_REPLIES.length)];
+      return { text, mentions: [] };
     }
     throw err;
   }

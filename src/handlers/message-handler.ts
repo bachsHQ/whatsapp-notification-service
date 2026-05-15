@@ -1,5 +1,6 @@
 import { WASocket, proto } from '@whiskeysockets/baileys';
 import { generateReply } from '../ai/ai';
+import { registerContact } from '../ai/contacts';
 import { logger } from '../utils/logger';
 
 // Unwrap all the common message wrapper layers and return the inner IMessage
@@ -108,16 +109,25 @@ export class MessageHandler {
     const senderJid = msg.key.participant ?? '';
     logger.info({ group: jid, sender: senderJid, text: cleanText }, 'Mention received');
 
+    // Auto-register sender so Lady Bachs can tag them later by name
+    // (she'll learn their name from conversation context)
+    registerContact(senderJid.split('@')[0], senderJid);
+
     try {
       const reply = await generateReply(senderJid, cleanText);
 
       await this.sock.sendMessage(
         jid,
-        { text: reply },
+        {
+          text: reply.text,
+          ...(reply.mentions.length > 0 && {
+            mentions: reply.mentions.map((m) => m.jid)
+          })
+        },
         { quoted: msg as proto.IWebMessageInfo & { key: proto.IMessageKey } }
       );
 
-      logger.info({ group: jid }, 'AI reply sent');
+      logger.info({ group: jid, mentions: reply.mentions }, 'AI reply sent');
     } catch (err) {
       logger.error({ err }, 'Failed to generate or send AI reply');
     }
