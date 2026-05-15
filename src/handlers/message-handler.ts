@@ -90,9 +90,10 @@ export class MessageHandler {
     logger.debug({ botJid: this.botJid, botLid: this.botLid, botNumber, botLidNumber, mentionedJids }, 'Checking mention');
 
     const isMentioned = mentionedJids.some((m) => {
-      const bare = m.split(':')[0];
-      if (m.endsWith('@lid')) return bare === botLidNumber;
-      return bare + '@s.whatsapp.net' === botNumber;
+      // Strip device suffix (:0, :2, etc) and domain (@s.whatsapp.net, @lid)
+      const numericId = m.split('@')[0].split(':')[0];
+      if (m.endsWith('@lid')) return numericId === botLidNumber;
+      return numericId + '@s.whatsapp.net' === botNumber;
     });
 
     if (!isMentioned) {
