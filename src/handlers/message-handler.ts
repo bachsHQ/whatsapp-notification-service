@@ -109,7 +109,7 @@ export class MessageHandler {
     logger.info({ group: jid, sender: senderJid, text: cleanText }, 'Mention received');
 
     try {
-      const reply = await generateReply(cleanText);
+      const reply = await generateReply(senderJid, cleanText);
 
       await this.sock.sendMessage(
         jid,

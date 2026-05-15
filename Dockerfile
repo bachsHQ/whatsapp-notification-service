@@ -39,8 +39,8 @@ RUN npm ci --production
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Create directory for WhatsApp auth state (will be mounted as volume)
-RUN mkdir -p auth_info_baileys
+# Create directories for WhatsApp auth state and user memory (mounted as volumes)
+RUN mkdir -p auth_info_baileys memory
 
 # Expose port for web server (Railway will set PORT env var)
 EXPOSE 3000
@@ -52,6 +52,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Create entrypoint script to fix permissions and start app
 RUN echo '#!/bin/sh\n\
 chmod -R 777 /app/auth_info_baileys 2>/dev/null || true\n\
+chmod -R 777 /app/memory 2>/dev/null || true\n\
 exec node dist/index.js' > /entrypoint.sh && \
     chmod +x /entrypoint.sh
 

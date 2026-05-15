@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { config } from '../utils/config';
+import { loadMemory, appendAndSave, Message } from './memory';
 
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
@@ -42,15 +43,28 @@ const QUOTA_REPLIES = [
   "i'm here i'm here, just had a moment. retry?",
 ];
 
-export async function generateReply(userMessage: string): Promise<string> {
+export async function generateReply(senderJid: string, userMessage: string): Promise<string> {
+  const mem = loadMemory(senderJid);
+
+  // Build input from history + current message
+  const input: Message[] = [
+    ...mem.history,
+    { role: 'user', content: userMessage }
+  ];
+
   try {
     const response = await openai.responses.create({
       model: 'gpt-4.1-mini',
       instructions: SYSTEM_PROMPT,
-      input: userMessage
+      input: input.map((m) => ({ role: m.role, content: m.content }))
     });
 
-    return response.output_text ?? "okay that one came out blank 😭 try me again";
+    const reply = response.output_text ?? "okay that one came out blank 😭 try me again";
+
+    // Persist the exchange
+    appendAndSave(senderJid, userMessage, reply);
+
+    return reply;
   } catch (err: any) {
     if (err?.status === 429) {
       return QUOTA_REPLIES[Math.floor(Math.random() * QUOTA_REPLIES.length)];
