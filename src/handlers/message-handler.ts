@@ -2,41 +2,70 @@ import { WASocket, proto } from '@whiskeysockets/baileys';
 import { generateReply } from '../ai/gemini';
 import { logger } from '../utils/logger';
 
+// Unwrap all the common message wrapper layers and return the inner IMessage
+function unwrapMessage(msg: proto.IWebMessageInfo): proto.IMessage | null {
+  const m = msg.message;
+  if (!m) return null;
+
+  return (
+    m.ephemeralMessage?.message ??
+    m.viewOnceMessage?.message ??
+    m.viewOnceMessageV2?.message?.viewOnceMessage?.message ??
+    m.documentWithCaptionMessage?.message ??
+    m
+  );
+}
+
+// Extract plain text from any message type that carries text
+function extractText(m: proto.IMessage): string {
+  return (
+    m.conversation ||
+    m.extendedTextMessage?.text ||
+    m.imageMessage?.caption ||
+    m.videoMessage?.caption ||
+    m.documentMessage?.caption ||
+    m.buttonsResponseMessage?.selectedDisplayText ||
+    m.listResponseMessage?.title ||
+    ''
+  );
+}
+
+// Extract mentioned JIDs from any context layer
+function extractMentions(m: proto.IMessage): string[] {
+  return (
+    m.extendedTextMessage?.contextInfo?.mentionedJid ??
+    m.imageMessage?.contextInfo?.mentionedJid ??
+    m.videoMessage?.contextInfo?.mentionedJid ??
+    []
+  );
+}
+
 export class MessageHandler {
   private sock: WASocket;
   private botJid: string = '';
 
   constructor(sock: WASocket) {
     this.sock = sock;
-    // Fetch bot's own JID so we can detect mentions
-    sock.user && (this.botJid = sock.user.id);
+    if (sock.user) this.botJid = sock.user.id;
   }
 
   async handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
     if (!msg.key) return;
 
-    // Only handle group messages
+    // Only group messages
     const jid = msg.key.remoteJid ?? '';
     if (!jid.endsWith('@g.us')) return;
 
-    // Ignore messages sent by the bot itself
+    // Ignore own messages
     if (msg.key.fromMe) return;
 
-    const content = msg.message;
-    if (!content) return;
+    const inner = unwrapMessage(msg);
+    if (!inner) return;
 
-    const text =
-      content.conversation ||
-      content.extendedTextMessage?.text ||
-      content.ephemeralMessage?.message?.extendedTextMessage?.text ||
-      '';
-
+    const text = extractText(inner);
     if (!text) return;
 
-    // Check if the bot is mentioned
-    const mentionedJids: string[] =
-      content.extendedTextMessage?.contextInfo?.mentionedJid ?? [];
-
+    const mentionedJids = extractMentions(inner);
     const botNumber = this.botJid.split(':')[0] + '@s.whatsapp.net';
     const isMentioned = mentionedJids.some(
       (m) => m.split(':')[0] + '@s.whatsapp.net' === botNumber
@@ -44,7 +73,7 @@ export class MessageHandler {
 
     if (!isMentioned) return;
 
-    // Strip the @mention tag from the message before sending to AI
+    // Strip @mentions from text before sending to AI
     const cleanText = text.replace(/@\d+/g, '').trim();
     if (!cleanText) return;
 
@@ -54,12 +83,11 @@ export class MessageHandler {
     try {
       const reply = await generateReply(cleanText);
 
-      await this.sock.sendMessage(jid, {
-        text: reply,
-        mentions: [senderJid]
-      }, {
-        quoted: msg as proto.IWebMessageInfo & { key: proto.IMessageKey }
-      });
+      await this.sock.sendMessage(
+        jid,
+        { text: reply, mentions: [senderJid] },
+        { quoted: msg as proto.IWebMessageInfo & { key: proto.IMessageKey } }
+      );
 
       logger.info({ group: jid }, 'AI reply sent');
     } catch (err) {
