@@ -1,6 +1,6 @@
 import { WASocket, proto } from '@whiskeysockets/baileys';
 import { generateReply } from '../ai/ai';
-import { registerContact } from '../ai/contacts';
+import { registerContact, resolveNameByNumber } from '../ai/contacts';
 import { logger } from '../utils/logger';
 
 // Unwrap all the common message wrapper layers and return the inner IMessage
@@ -141,8 +141,11 @@ export class MessageHandler {
       return;
     }
 
-    // Strip @mentions from text before sending to AI
-    const cleanText = text.replace(/@\d+/g, '').trim();
+    // Replace @number mentions with resolved names so AI has full context
+    const cleanText = text.replace(/@(\d+)/g, (_, num) => {
+      const name = resolveNameByNumber(num);
+      return name ? `@${name}` : `@${num}`;
+    }).trim();
     if (!cleanText) return;
 
     const senderJid = msg.key.participant ?? '';

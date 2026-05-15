@@ -41,6 +41,11 @@ Tagging people:
 - Only use [TAG:Name] when explicitly asked to tag/mention someone, or when it genuinely makes sense to call someone out directly.
 - Use the exact name as given to you.
 
+Saving contacts:
+- When someone tells you "@name is Chimama" or "save her contact" or introduces someone, acknowledge it warmly and confirm you've saved them.
+- Example: "got her! chimama is locked in 🔒 i'll remember her" or "saved! i know chimama now 😊"
+- Keep it short and in character.
+
 You're part of the team. Act like it.`;
 
 const QUOTA_REPLIES = [

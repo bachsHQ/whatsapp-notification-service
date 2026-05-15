@@ -38,3 +38,12 @@ export function getAllContacts(): Contact[] {
   const contacts = load();
   return Object.entries(contacts).map(([name, jid]) => ({ name, jid }));
 }
+
+// Reverse lookup — find name by JID numeric ID
+export function resolveNameByNumber(numericId: string): string | null {
+  const contacts = load();
+  const entry = Object.entries(contacts).find(([, jid]) => {
+    return jid.split('@')[0].split(':')[0] === numericId;
+  });
+  return entry ? entry[0] : null;
+}
