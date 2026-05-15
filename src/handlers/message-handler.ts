@@ -43,10 +43,15 @@ function extractMentions(m: proto.IMessage): string[] {
 export class MessageHandler {
   private sock: WASocket;
   private botJid: string = '';
+  private botLid: string = '';
 
   constructor(sock: WASocket) {
     this.sock = sock;
-    if (sock.user) this.botJid = sock.user.id;
+    if (sock.user) {
+      this.botJid = sock.user.id;
+      // LID is stored as sock.user.lid on newer WhatsApp multi-device accounts
+      this.botLid = (sock.user as any).lid ?? '';
+    }
   }
 
   async handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
@@ -81,11 +86,14 @@ export class MessageHandler {
 
     const mentionedJids = extractMentions(inner);
     const botNumber = this.botJid.split(':')[0] + '@s.whatsapp.net';
-    logger.debug({ botJid: this.botJid, botNumber, mentionedJids }, 'Checking mention');
+    const botLidNumber = this.botLid ? this.botLid.split(':')[0] : '';
+    logger.debug({ botJid: this.botJid, botLid: this.botLid, botNumber, botLidNumber, mentionedJids }, 'Checking mention');
 
-    const isMentioned = mentionedJids.some(
-      (m) => m.split(':')[0] + '@s.whatsapp.net' === botNumber
-    );
+    const isMentioned = mentionedJids.some((m) => {
+      const bare = m.split(':')[0];
+      if (m.endsWith('@lid')) return bare === botLidNumber;
+      return bare + '@s.whatsapp.net' === botNumber;
+    });
 
     if (!isMentioned) {
       logger.debug({ jid }, 'Skipping — bot not mentioned');
