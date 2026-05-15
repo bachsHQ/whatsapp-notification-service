@@ -52,26 +52,45 @@ export class MessageHandler {
   async handleMessage(msg: proto.IWebMessageInfo): Promise<void> {
     if (!msg.key) return;
 
-    // Only group messages
     const jid = msg.key.remoteJid ?? '';
-    if (!jid.endsWith('@g.us')) return;
+
+    // Only group messages
+    if (!jid.endsWith('@g.us')) {
+      logger.debug({ jid }, 'Skipping — not a group message');
+      return;
+    }
 
     // Ignore own messages
     if (msg.key.fromMe) return;
 
     const inner = unwrapMessage(msg);
-    if (!inner) return;
+    logger.debug({ jid, messageKeys: Object.keys(msg.message ?? {}), inner: JSON.stringify(inner) }, 'Raw message received');
+
+    if (!inner) {
+      logger.debug({ jid }, 'Skipping — could not unwrap message');
+      return;
+    }
 
     const text = extractText(inner);
-    if (!text) return;
+    logger.debug({ jid, text }, 'Extracted text');
+
+    if (!text) {
+      logger.debug({ jid }, 'Skipping — no text found');
+      return;
+    }
 
     const mentionedJids = extractMentions(inner);
     const botNumber = this.botJid.split(':')[0] + '@s.whatsapp.net';
+    logger.debug({ botJid: this.botJid, botNumber, mentionedJids }, 'Checking mention');
+
     const isMentioned = mentionedJids.some(
       (m) => m.split(':')[0] + '@s.whatsapp.net' === botNumber
     );
 
-    if (!isMentioned) return;
+    if (!isMentioned) {
+      logger.debug({ jid }, 'Skipping — bot not mentioned');
+      return;
+    }
 
     // Strip @mentions from text before sending to AI
     const cleanText = text.replace(/@\d+/g, '').trim();
