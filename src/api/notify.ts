@@ -2,16 +2,29 @@ import { WASocket } from '@whiskeysockets/baileys';
 import { logger } from '../utils/logger';
 
 const MAX_ATTEMPTS = 3;
-const BASE_DELAY_MS = 500;
+
+// Invisible unicode variation selectors — appended randomly to avoid identical
+// message fingerprints across recipients without changing visible content.
+const VARIATION_CHARS = ['​', '‌', '‍', '﻿'];
 
 function toJid(to: string): string {
-  // Strip any non-digit chars except leading +, then append @s.whatsapp.net
   const digits = to.replace(/\D/g, '');
   return `${digits}@s.whatsapp.net`;
 }
 
-async function sleep(ms: number) {
+function randomBetween(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Appends a random invisible char so the message is never byte-identical
+// across sends, reducing spam fingerprint risk.
+function vary(message: string): string {
+  const char = VARIATION_CHARS[Math.floor(Math.random() * VARIATION_CHARS.length)];
+  return message + char;
 }
 
 export async function sendNotification(
@@ -20,11 +33,17 @@ export async function sendNotification(
   message: string
 ): Promise<void> {
   const jid = toJid(to);
+
+  // Random pre-send delay: 5–15 seconds, as recommended to avoid rate limiting
+  const preDelay = randomBetween(5000, 15000);
+  logger.debug({ to, preDelayMs: preDelay }, 'Pre-send delay');
+  await sleep(preDelay);
+
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      await sock.sendMessage(jid, { text: message });
+      await sock.sendMessage(jid, { text: vary(message) });
       logger.info({ to, jid, attempt }, 'Notification sent');
       return;
     } catch (err) {
@@ -32,7 +51,8 @@ export async function sendNotification(
       logger.warn({ to, jid, attempt, err }, 'Send attempt failed');
 
       if (attempt < MAX_ATTEMPTS) {
-        await sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
+        // Exponential backoff between retry attempts: 2s, 4s
+        await sleep(2000 * 2 ** (attempt - 1));
       }
     }
   }
