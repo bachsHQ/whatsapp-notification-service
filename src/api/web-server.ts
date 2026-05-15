@@ -36,6 +36,27 @@ export class WebServer {
   }
 
   private setupRoutes() {
+    // GET /groups — list all groups the bot is a member of
+    this.app.get('/groups', this.requireApiKey.bind(this), async (_req: Request, res: Response) => {
+      const sock = this.whatsappConnection?.getSocket();
+      if (!this.whatsappConnection?.isConnected() || !sock) {
+        res.status(503).json({ error: 'WhatsApp not connected', status: this.connectionStatus });
+        return;
+      }
+
+      try {
+        const groups = await sock.groupFetchAllParticipating();
+        const list = Object.values(groups).map((g) => ({
+          id: g.id,
+          name: g.subject
+        }));
+        res.json(list);
+      } catch (err: any) {
+        logger.error({ err }, 'Failed to fetch groups');
+        res.status(502).json({ error: 'Failed to fetch groups', detail: err?.message });
+      }
+    });
+
     // POST /notify — send a WhatsApp message
     this.app.post('/notify', this.requireApiKey.bind(this), async (req: Request, res: Response) => {
       const { to, message } = req.body ?? {};

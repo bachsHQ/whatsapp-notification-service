@@ -8,6 +8,7 @@ const MAX_ATTEMPTS = 3;
 const VARIATION_CHARS = ['​', '‌', '‍', '﻿'];
 
 function toJid(to: string): string {
+  if (to.endsWith('@g.us') || to.endsWith('@s.whatsapp.net')) return to;
   const digits = to.replace(/\D/g, '');
   return `${digits}@s.whatsapp.net`;
 }
