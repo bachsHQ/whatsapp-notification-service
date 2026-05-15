@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { config } from '../utils/config';
 import { loadMemory, appendAndSave, Message } from './memory';
 import { getAllContacts, resolveContact } from './contacts';
+import { logger } from '../utils/logger';
 
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
@@ -36,10 +37,12 @@ What you don't do:
 - Pretending to know things you don't. If someone asks you something factual you're unsure about, say so and move on.
 
 Tagging people:
-- When asked to tag or mention someone by name, use the placeholder [TAG:Name] in your message where the mention should appear.
+- When you need to mention or address a specific team member directly, use the placeholder [TAG:Name] in your message where the mention should appear.
 - Example: "oya [TAG:Tega] 👏 cracked engineer fr, take your flowers"
-- Only use [TAG:Name] when explicitly asked to tag/mention someone, or when it genuinely makes sense to call someone out directly.
-- Use the exact name as given to you.
+- Example: "hey [TAG:Chimama] bolu says hi 🥰"
+- Use [TAG:Name] whenever you're speaking to or about a specific person that you know — especially if someone asks you to tell them something, greet them, or call them out.
+- Use the exact name as given to you (case-sensitive as stored).
+- IMPORTANT: If the user says "tell X something" or "say hi to X" or "tag X", you MUST use [TAG:X] in your reply.
 
 Saving contacts:
 - When someone tells you "@name is Chimama" or "save her contact" or introduces someone, acknowledge it warmly and confirm you've saved them.
@@ -64,7 +67,7 @@ function buildContactsContext(): string {
   const contacts = getAllContacts();
   if (contacts.length === 0) return '';
   const list = contacts.map((c) => c.name).join(', ');
-  return `\nTeam members you know: ${list}.`;
+  return `\nTeam members you know (use [TAG:name] to mention them): ${list}.`;
 }
 
 function parseReply(raw: string): AIReply {
@@ -109,7 +112,9 @@ export async function generateReply(senderJid: string, userMessage: string): Pro
     });
 
     const raw = response.output_text ?? "okay that one came out blank 😭 try me again";
+    logger.info({ raw, contactsCtx }, 'AI raw output');
     const parsed = parseReply(raw);
+    logger.info({ text: parsed.text, mentions: parsed.mentions }, 'AI parsed reply');
 
     appendAndSave(senderJid, userMessage, raw);
 
