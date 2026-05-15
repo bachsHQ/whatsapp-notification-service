@@ -31,6 +31,41 @@ function extractText(m: proto.IMessage): string {
   );
 }
 
+// Detect name introductions for mentioned JIDs
+// Handles: "@Chimama is Chimama", "Chimama is @...", "save her as Chimama", "@... is <Name>"
+function extractNameFromIntroduction(
+  text: string,
+  mentionedJids: string[]
+): Array<{ name: string; jid: string }> {
+  if (mentionedJids.length === 0) return [];
+
+  const results: Array<{ name: string; jid: string }> = [];
+
+  // Pattern: "@mention is <Name>" or "<Name> is @mention"
+  const isPattern = /(?:@\d+\s+is\s+([A-Za-z]+)|([A-Za-z]+)\s+is\s+@\d+)/gi;
+  // Pattern: "save (her|him|them|this) (as|contact) <Name>" or "her name is <Name>"
+  const savePattern = /(?:save\s+(?:her|him|them|this|as)|(?:her|his|their)\s+name\s+is)\s+([A-Za-z]+)/gi;
+
+  let match;
+  while ((match = isPattern.exec(text)) !== null) {
+    const name = (match[1] || match[2])?.trim();
+    if (name && mentionedJids.length > 0) {
+      results.push({ name, jid: mentionedJids[0] });
+    }
+  }
+
+  if (results.length === 0) {
+    while ((match = savePattern.exec(text)) !== null) {
+      const name = match[1]?.trim();
+      if (name && mentionedJids.length > 0) {
+        results.push({ name, jid: mentionedJids[0] });
+      }
+    }
+  }
+
+  return results;
+}
+
 // Extract mentioned JIDs from any context layer
 function extractMentions(m: proto.IMessage): string[] {
   return (
@@ -113,9 +148,16 @@ export class MessageHandler {
     const senderJid = msg.key.participant ?? '';
     logger.info({ group: jid, sender: senderJid, text: cleanText }, 'Mention received');
 
-    // Auto-register sender so Lady Bachs can tag them later by name
-    // (she'll learn their name from conversation context)
-    registerContact(senderJid.split('@')[0], senderJid);
+    // Auto-register sender
+    registerContact(senderJid.split('@')[0].split(':')[0], senderJid);
+
+    // Detect "X is <Name>" or "<Name> is X" patterns for mentioned JIDs
+    // e.g. "@246952650362894 is Chimama, save her contact"
+    const nameFromMention = extractNameFromIntroduction(text, mentionedJids);
+    for (const { name, jid: contactJid } of nameFromMention) {
+      registerContact(name, contactJid);
+      logger.info({ name, contactJid }, 'Contact registered from introduction');
+    }
 
     try {
       const reply = await generateReply(senderJid, cleanText);
