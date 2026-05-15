@@ -1,7 +1,8 @@
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
-  WASocket
+  WASocket,
+  Browsers
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
@@ -35,14 +36,18 @@ export class WhatsAppConnection {
 
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
-    const sock = makeWASocket({ auth: state });
+    const sock = makeWASocket({
+      auth: state,
+      browser: Browsers.ubuntu('Chrome'),
+      printQRInTerminal: false
+    });
     this.sock = sock;
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        logger.info('QR Code ready — scan via /qr or terminal below');
+        logger.info('QR Code ready — scan via /qr');
         console.log('\n--- WhatsApp QR Code ---');
         qrcode.generate(qr, { small: true });
         console.log('------------------------\n');
@@ -59,14 +64,19 @@ export class WhatsAppConnection {
           return;
         }
 
-        const newStatus: ConnectionStatus = statusCode === DisconnectReason.loggedOut ? 'logged_out' : 'disconnected';
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+        const newStatus: ConnectionStatus = isLoggedOut ? 'logged_out' : 'disconnected';
         this.currentStatus = newStatus;
         this.statusCallback?.(newStatus);
 
         logger.error({ statusCode, error: lastDisconnect?.error?.message }, 'Connection closed');
 
-        if (newStatus === 'logged_out') {
+        if (isLoggedOut) {
           logger.error('Logged out — delete auth_info_baileys/ and reconnect.');
+        } else {
+          // Auto-reconnect after transient failures
+          logger.info('Reconnecting in 5s...');
+          setTimeout(() => this.connect().catch((err) => logger.error({ err }, 'Reconnect failed')), 5000);
         }
       } else if (connection === 'open') {
         this.isConnecting = false;
