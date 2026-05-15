@@ -2,6 +2,7 @@ import { whatsappConnection } from './bot/connection';
 import { WebServer } from './api/web-server';
 import { logger } from './utils/logger';
 import { config } from './utils/config';
+import fs from 'fs';
 
 async function main() {
   logger.info('Starting WhatsApp Notification Service...');
@@ -16,8 +17,14 @@ async function main() {
 
     webServer.setWhatsAppConnection(whatsappConnection);
 
-    logger.info(`Visit http://localhost:${config.port}/qr to connect WhatsApp`);
-    logger.info('POST /notify to send notifications (requires X-API-Key header)');
+    // Auto-connect if a saved session exists on the volume
+    const sessionExists = fs.existsSync('auth_info_baileys/creds.json');
+    if (sessionExists) {
+      logger.info('Saved session found — connecting automatically...');
+      whatsappConnection.connect().catch((err) => logger.error({ err }, 'Auto-connect failed'));
+    } else {
+      logger.info(`No session found — visit http://localhost:${config.port}/qr to connect WhatsApp`);
+    }
 
     const shutdown = async () => {
       logger.info('Shutting down...');
