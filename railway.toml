@@ -1,0 +1,33 @@
+# Railway Configuration for WhatsApp Bot Service
+# https://docs.railway.app/deploy/config-as-code
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "node dist/index.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Health check configuration
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+
+# Volume mounts for persistent WhatsApp auth state
+# NOTE: You need to create this volume in Railway dashboard first
+# Path: /app/auth_info_baileys
+# This stores WhatsApp authentication credentials
+
+# Environment variables (set these in Railway dashboard)
+# Required:
+# - PYTHON_BACKEND_URL: URL of your Python backend (e.g., https://your-backend.railway.app)
+# - API_KEY: Secure API key matching backend WHATSAPP_BOT_API_KEY
+# - BOT_INSTANCE_ID: Unique ID for this bot instance (1, 2, 3, etc.)
+#
+# Optional:
+# - PORT: Web server port (Railway sets this automatically, defaults to 3000)
+# - BOT_NAME: Display name for bot (default: "SyncGram Membership Bot")
+# - LOG_LEVEL: Logging level (default: "info", options: trace, debug, info, warn, error, fatal)
+# - PENDING_REQUESTS_POLL_INTERVAL: Poll interval in ms (default: 5000)
+# - NODE_ENV: Set to "production" for production deployment
