@@ -57,12 +57,12 @@ export class WebServer {
       }
     });
 
-    // POST /notify — send a WhatsApp message
+    // POST /notify — send a WhatsApp message to one or multiple recipients
     this.app.post('/notify', this.requireApiKey.bind(this), async (req: Request, res: Response) => {
       const { to, message } = req.body ?? {};
 
-      if (!to || typeof to !== 'string') {
-        res.status(400).json({ error: 'Missing or invalid "to" field (E.164 phone number)' });
+      if (!to || (typeof to !== 'string' && !Array.isArray(to))) {
+        res.status(400).json({ error: '"to" must be a phone number string or an array of phone numbers/group JIDs' });
         return;
       }
       if (!message || typeof message !== 'string') {
@@ -76,13 +76,23 @@ export class WebServer {
         return;
       }
 
-      try {
-        await sendNotification(sock, to, message);
-        res.json({ ok: true, to });
-      } catch (err: any) {
-        logger.error({ err, to }, 'Failed to send notification');
-        res.status(502).json({ error: 'Failed to deliver message', detail: err?.message });
-      }
+      const recipients: string[] = Array.isArray(to) ? to : [to];
+
+      const results = await Promise.allSettled(
+        recipients.map((recipient) => sendNotification(sock, recipient, message))
+      );
+
+      const summary = results.map((result, i) => ({
+        to: recipients[i],
+        ok: result.status === 'fulfilled',
+        ...(result.status === 'rejected' && { error: (result.reason as any)?.message })
+      }));
+
+      const allOk = summary.every((s) => s.ok);
+      const anyOk = summary.some((s) => s.ok);
+
+      const statusCode = allOk ? 200 : anyOk ? 207 : 502;
+      res.status(statusCode).json({ results: summary });
     });
 
     // GET /health
