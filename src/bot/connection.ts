@@ -1,12 +1,15 @@
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
+  fetchLatestBaileysVersion,
   WASocket,
   Browsers
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
+import pino from 'pino';
 import qrcode from 'qrcode-terminal';
-import { logger, baileysLogger } from '../utils/logger';
+import { logger } from '../utils/logger';
+import { config } from '../utils/config';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'logged_out';
 
@@ -35,12 +38,15 @@ export class WhatsAppConnection {
     logger.info('Starting WhatsApp connection...');
 
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    logger.info({ version: version.join('.'), isLatest }, 'WA version');
 
     const sock = makeWASocket({
+      version,
       auth: state,
       browser: Browsers.ubuntu('Chrome'),
       printQRInTerminal: false,
-      logger: baileysLogger as any
+      logger: pino({ level: 'silent' })
     });
     this.sock = sock;
 
