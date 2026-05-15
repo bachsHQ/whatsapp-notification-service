@@ -35,14 +35,28 @@ What you don't do:
 
 You're part of the team. Act like it.`;
 
-export async function generateReply(userMessage: string): Promise<string> {
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
-    contents: userMessage,
-    config: {
-      systemInstruction: SYSTEM_PROMPT
-    }
-  });
+const QUOTA_REPLIES = [
+  "abeg give me a second, my brain is loading 😅",
+  "ahn ahn i'm thinking too hard rn, try again in a bit",
+  "okay i blacked out for a sec 💀 ask me again",
+  "i'm here i'm here, just had a moment. retry?",
+];
 
-  return response.text ?? "Sorry, I couldn't come up with a response. Try again!";
+export async function generateReply(userMessage: string): Promise<string> {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-lite',
+      contents: userMessage,
+      config: {
+        systemInstruction: SYSTEM_PROMPT
+      }
+    });
+
+    return response.text ?? "okay that one came out blank 😭 try me again";
+  } catch (err: any) {
+    if (err?.status === 429) {
+      return QUOTA_REPLIES[Math.floor(Math.random() * QUOTA_REPLIES.length)];
+    }
+    throw err;
+  }
 }
