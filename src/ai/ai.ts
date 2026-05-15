@@ -74,10 +74,14 @@ function parseReply(raw: string): AIReply {
   const text = raw.replace(TAG_RE, (_, name) => {
     const jid = resolveContact(name);
     if (jid) {
-      mentions.push({ name, jid });
-      return `@${jid.split('@')[0].split(':')[0]}`;
+      // WhatsApp mentions need @s.whatsapp.net — convert LID JIDs
+      const numericId = jid.split('@')[0].split(':')[0];
+      const mentionJid = jid.endsWith('@lid')
+        ? `${numericId}@s.whatsapp.net`
+        : jid;
+      mentions.push({ name, jid: mentionJid });
+      return `@${numericId}`;
     }
-    // Unknown contact — keep name as plain text
     return name;
   });
 
