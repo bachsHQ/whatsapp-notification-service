@@ -113,7 +113,7 @@ export class MessageHandler {
 
       await this.sock.sendMessage(
         jid,
-        { text: reply, mentions: [senderJid] },
+        { text: reply },
         { quoted: msg as proto.IWebMessageInfo & { key: proto.IMessageKey } }
       );
 
