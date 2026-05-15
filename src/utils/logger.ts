@@ -13,4 +13,9 @@ export const logger = pino({
   }
 });
 
+// Baileys child logger — silent unless LOG_LEVEL=debug
+export const baileysLogger = logger.child({ module: 'baileys' }, {
+  level: config.logLevel === 'debug' ? 'debug' : 'silent'
+});
+
 export default logger;

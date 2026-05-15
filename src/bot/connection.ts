@@ -6,7 +6,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
-import { logger } from '../utils/logger';
+import { logger, baileysLogger } from '../utils/logger';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'logged_out';
 
@@ -39,7 +39,8 @@ export class WhatsAppConnection {
     const sock = makeWASocket({
       auth: state,
       browser: Browsers.ubuntu('Chrome'),
-      printQRInTerminal: false
+      printQRInTerminal: false,
+      logger: baileysLogger as any
     });
     this.sock = sock;
 
